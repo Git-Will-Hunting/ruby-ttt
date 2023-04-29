@@ -1,3 +1,4 @@
+require 'pry-byebug'
 # tic tac toe game
 
 # tic tac toe is a game played on a 3x3 board with two players. the first player
@@ -24,13 +25,22 @@ class Game
         @player1 = Player.new('Player 1', 'X')
         @player2 = Player.new('Player 2', 'O')
         @board = Board.new()
-        @current_player = @turn_count.odd? ? @player1 : @player2
     end
     # starts the game
     def play()
+        @board.draw()
         while !game_end?()
-            @board.draw()
             handle_input()
+        end
+        if @board.check_win?()
+            if @turn_count.odd?
+                @winner = @player1
+            else
+                @winner = @player2
+            end
+            puts "Congratulations #{@winner} you win!"
+        else
+            puts "The game is a tie!"
         end
     end
     # ends the game
@@ -43,7 +53,6 @@ class Game
         @board = Board.new()
         @turn_count = 1
         @winner = nil
-        @current_player = @turn_count.odd? ? @player1 : @player2
         @board.draw()
         handle_input()        
     end
@@ -57,29 +66,33 @@ class Game
         puts "---+---+---"
         puts " 7 | 8 | 9 "
         puts "Type 'quit' to end the game, 'restart' to start a new game, or 'help' to see this message again."
-        
+        # pause until the user presses enter
+        gets        
     end
     # player move
-    def player_move()
+    def player_move(player_input)
         # reference player input
-        position = @current_player[:input].to_i - 1
-        # check if move is valid
-        if @board.is_empty?(position)
-            # if valid, update board
-            @board[position] = @current_player[:symbol]
-            # if not valid, prompt player for move again
+        position = player_input.to_i - 1
+        if @turn_count.odd?
+            @board.position(position, @player1.symbol)
+            @turn_count += 1
         else
-            puts "That position is already taken, please enter another number:"
-            handle_input()
+            @board.position(position, @player2.symbol)
+            @turn_count += 1
         end
-        @turn_count += 1
-        @current_player = @turn_count.odd? ? @player1 : @player2
+        @board.draw()
     end
 
     # handles player input
     def handle_input()
-        puts "#{@current_player[:name]} you're #{@current_player[:symbol]}'s, please enter a number between 1 and 9:"
-        input = @current_player.take_input()
+        # check current player
+        if @turn_count.odd?
+            puts "#{@player1.name} you're #{@player1.symbol}'s, please enter a number between 1 and 9:"
+            input = @player1.take_input()
+        else
+            puts "#{@player2.name} you're #{@player2.symbol}'s, please enter a number between 1 and 9:"
+            input = @player2.take_input()
+        end
         case input
         when 'quit'
             quit()            
@@ -88,7 +101,7 @@ class Game
         when 'help'
             help()
         when '1'..'9'
-            player_move()
+            player_move(input)
         else
             puts "That is not a valid input, please try again: (type 'help' for a list of commands)"
             handle_input()
@@ -108,44 +121,44 @@ end
 class Board
     def initialize()
         @board = Array.new(9, nil)
+        @position = 0
     end
+    # attr_accessor :board
+    def position(position, symbol)
+        if is_empty?(position)
+            @board[position] = symbol
+        else
+            puts "That position is already taken, please enter another number:"
+            handle_input()
+        end
+    end
+    
     def draw()
         system 'clear'
-        puts " #{@board[1] || ' '} | #{@board[2] || ' '} | #{@board[3] || ' '} "
+        puts " #{@board[0] || ' '} | #{@board[1] || ' '} | #{@board[2] || ' '} "
         puts "---+---+---"
-        puts " #{@board[4] || ' '} | #{@board[5] || ' '} | #{@board[6] || ' '} "
+        puts " #{@board[3] || ' '} | #{@board[4] || ' '} | #{@board[5] || ' '} "
         puts "---+---+---"
-        puts " #{@board[7] || ' '} | #{@board[8] || ' '} | #{@board[9] || ' '} "
+        puts " #{@board[6] || ' '} | #{@board[7] || ' '} | #{@board[8] || ' '} "
     end
     def is_empty?(position)
+        position = position.to_i
         @board[position].nil?
     end
     def check_full?()
-        @board.none? {|position| is_empty?(position)}
+        @board.none? {|square| is_empty?(square)}
     end
     def check_win?()
-        # return true if the board contains a winning combination of symbols that are not nil
-        # check rows
-        if @board[0] == @board[1] && @board[1] == @board[2] && !is_empty?(0)
-            return true
-        elsif @board[3] == @board[4] && @board[4] == @board[5] && !is_empty?(3)
-            return true
-        elsif @board[6] == @board[7] && @board[7] == @board[8] && !is_empty?(6)
-            return true
-        # check columns
-        elsif @board[0] == @board[3] && @board[3] == @board[6] && !is_empty?(0)
-            return true
-        elsif @board[1] == @board[4] && @board[4] == @board[7] && !is_empty?(1)
-            return true
-        elsif @board[2] == @board[5] && @board[5] == @board[8] && !is_empty?(2)
-            return true
-        # check diagonals
-        elsif @board[0] == @board[4] && @board[4] == @board[8] && !is_empty?(0)
-            return true
-        elsif @board[2] == @board[4] && @board[4] == @board[6] && !is_empty?(2)
-            return true
-        else
-            return false
+        # set winning combinations
+        winning_combinations = [
+            [0, 1, 2], [3, 4, 5], [6, 7, 8], # rows
+            [0, 3, 6], [1, 4, 7], [2, 5, 8], # columns
+            [0, 4, 8], [2, 4, 6] # diagonals
+        ]
+        # iterate through winning combinations
+        winning_combinations.any? do |a, b, c|
+            # check if any of the winning combinations are filled with the same symbol
+            !is_empty?(a) && @board[a] == @board[b] && @board[b] == @board[c]
         end
     end
 end
@@ -155,7 +168,14 @@ class Player
     def initialize(name, symbol)
         @name = name
         @symbol = symbol
-        @input = ''
+        @input = 1
+    end
+    # attr_reader :name, :symbol
+    def name()
+        @name
+    end
+    def symbol()
+        @symbol
     end
     def take_input()
         @input = gets.chomp.downcase
